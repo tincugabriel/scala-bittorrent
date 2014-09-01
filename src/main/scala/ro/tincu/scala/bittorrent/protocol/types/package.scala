@@ -1,4 +1,6 @@
-package ro.tincu.scala.bittorrent.protocol
+package ro.tincu.scala.bittorrent.protocol.types
+
+import scala.io.{Codec, Source}
 
 
 /**
@@ -6,13 +8,14 @@ package ro.tincu.scala.bittorrent.protocol
  */
 package object types {
 
-  def main(args: Array[String]) = {
-    val list = BEncodedList(List(BEncodedInt(5000), BEncodedString("Fooooooo")));
-    val map = Map[BEncodedString, BEncoded]((BEncodedString("100"), BEncodedString("5000")), (BEncodedString("bar"), list))
-//    println(BEncodedDict(map))
-    val (sameList, rest) = BEncoded.decodeList(list.toString).get
-    println(BEncoded.decodeDict(BEncodedDict(map).toString))
-//    sameList.value.foreach( x => println(x))
+  def main(args : Array[String]) {
+    val src = Source.fromFile("/home/gabriel/workspace/scala-bittorrent/src/main/resources/sample.torrent")(Codec.ISO8859)
+    val dict = BEncoded.decode(src.mkString)
+    dict match {
+      case Some(torr : Torrent) => {
+        println(torr.announce)
+      }
+    }
   }
 
   abstract class BEncoded {}
@@ -33,17 +36,17 @@ package object types {
     override def toString = value.foldLeft[String]("d")((x, y) => x + s"${y._1.toString}${y._2.toString}") + "e"
   }
 
-  class Torrent(announce : String, announceList : List[List[String]], info : TorrentInfo,
-                creationDate : Long, comment : String,
-                createdBy : String, encoding : String) {
+  class Torrent(val announce : String,val announceList : List[List[String]],val info : TorrentInfo,
+                val creationDate : Long,val comment : String,
+                val createdBy : String,val encoding : String) {
     def this(announce : String, announceList: List[List[String]], info : TorrentInfo) =
-       this(announce, announceList, info, 0, "", "", "")
+      this(announce, announceList, info, 0, "", "", "")
     def this(announce : String, info : TorrentInfo) = this(announce, Nil, info)
   }
 
-  class TorrentInfo(pieces : List[Byte], isPrivate : Boolean, pieceLength : Int, name : String,
-                    files : List[TorrentFileInfo]){
-    def this(pieces : List[Byte], isPrivate : Boolean, pieceLength : Int, name: String,
+  class TorrentInfo(val pieces : Array[Byte],val isPrivate : Boolean,val pieceLength : Int,val name : String,
+                    val files : List[TorrentFileInfo]){
+    def this(pieces : Array[Byte], isPrivate : Boolean, pieceLength : Int, name: String,
              length : Int, md5sum : String) = this(pieces, isPrivate, pieceLength, name, List(new TorrentFileInfo(name, length, md5sum)))
   }
 
@@ -51,14 +54,20 @@ package object types {
     def this(path : String, length : Int) = this(path, length, "")
   }
 
+
   object BEncoded {
 
     private val decoders = Map[Char, String => Option[(BEncoded, String)]](
       ('i', decodeInt),('l', decodeList), ('d', decodeDict))
 
-    def decode(value: String): Option[Any] = {
+    def decode(value: String): Option[Torrent] = {
       getNextDecoderMethod(value.head)(value) match {
-        case Some((bdecode,_)) => Some(toValue(bdecode))
+        case Some((bdecode,_)) => {
+          toValue(bdecode) match {
+            case m : Map[String, Any] => toTorrent(m)
+            case _ => None
+          }
+        }
         case _ => None
       }
     }
@@ -67,26 +76,69 @@ package object types {
       case BEncodedInt(value) => value
       case BEncodedString(value) => value
       case BEncodedList(value) => value map toValue
-      case BEncodedDict(value : Map[BEncodedString, BEncoded]) => value.map((k :BEncodedString, v: BEncoded) => (k.value, toValue(v)))
+      case BEncodedDict(value : Map[BEncodedString, BEncoded]) => value.map(mapKV)
     }
 
-    private def toTorrent(value : Map[String, Any]) : Option[Torrent] = {
-      None
+    def mapKV(k : (BEncodedString,BEncoded)) : (String, Any) = (k._1.value, toValue(k._2))
+
+    def toTorrent(value : Map[String, Any]) : Option[Torrent] = {
+      val announce = value.get("announce")
+      val announceList  = value.getOrElse("announce-list", Nil)
+      // TODO -> getTorrentInfo expects the big map
+      val info = value.get("info")
+      val comment = value.getOrElse("comment","")
+      val creationDate = value.getOrElse("creation date",0)
+      val createdBy = value.getOrElse("created by","")
+      val encoding = value.getOrElse("encoding","")
+      (announce, announceList, info, comment, creationDate, createdBy, encoding) match {
+        case (Some(a : String),al : List[List[String]], Some(i : Map[String,Any]),
+        c: String, cd : Int, cb : String, enc : String) => {
+          getTorrentInfo(value) match {
+            case None => None
+            case Some(inf) => Some(new Torrent(a, al, inf, cd, c, cb, enc))
+          }
+        }
+        case _ => None
+      }
+    }
+
+    def getTorrentFileInfo(dict : Map[String, Any]) : Option[TorrentFileInfo] = {
+      val md5sum = dict.get("md5sum")
+      val length = dict.get("length")
+      val path = dict.get("path")
+      (md5sum, length, path) match {
+        case (Some(s : String), Some(l : Int), Some(p : String)) => Some(new TorrentFileInfo(p, l, s))
+        case (None, Some(l : Int), Some(p : String)) => Some(new TorrentFileInfo(p, l))
+        case _ => None
+      }
     }
 
     private def getTorrentInfo(value : Map[String, Any]) : Option[TorrentInfo] = value.get("info") match {
-      case None => None
       case Some(info : Map[String, Any]) => {
         val pieces = info.get("pieces")
         val pieceLength = info.get("piece length")
         val files = info.get("files")
         val md5sum = info.get("md5sum")
         val length = info.get("length")
-        (pieces, pieceLength, files, md5sum, length) match {
-          case (Some(data : String), Some(l : Int), Some)
+        val name = info.get("name")
+        val isPrivate = info.getOrElse("private","0") == "0"
+        (pieces, pieceLength, files, md5sum, length, name, isPrivate) match {
+          case (Some(data : String), Some(l : Int),
+          Some(ll : List[BEncodedDict]), _, _, Some(n : String), _) =>
+            ll.map(toValue) match {
+              case a:List[Map[String, Any]] => Some(new TorrentInfo(data.getBytes, isPrivate, l, n, a.map(getTorrentFileInfo).flatten))
+              case _ => None
+            }
+          case (Some(data : String), Some(pill : Int),
+          _ , Some(sm : String), Some(l : Int), Some(nm : String), _) =>
+            Some(new TorrentInfo(data.getBytes, isPrivate, pill, nm, l, sm))
+          case (Some(data : String), Some(pill : Int),
+          _ , None, Some(l : Int), Some(nm : String), _) =>
+            Some(new TorrentInfo(data.getBytes, isPrivate, pill, nm, l, ""))
+          case _ => None
         }
       }
-      case _ => None
+      case None => None
     }
 
     def decodeInt(remaining: String): Option[(BEncodedInt, String)] = {
