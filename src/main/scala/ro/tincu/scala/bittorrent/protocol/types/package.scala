@@ -1,5 +1,6 @@
 package ro.tincu.scala.bittorrent.protocol.types
 
+import scala.collection.immutable.TreeMap
 import scala.io.{Codec, Source}
 
 
@@ -20,19 +21,20 @@ package object types {
 
   abstract class BEncoded {}
 
-  case class BEncodedInt(value: Int) extends BEncoded {
+  case class BEncodedInt(val value: Int) extends BEncoded {
     override def toString = s"i${value}e";
   }
 
-  case class BEncodedString(value: String) extends BEncoded {
+  case class BEncodedString(val value: String) extends BEncoded with Ordered[BEncodedString]{
     override def toString = s"${value.length}:$value"
+    def compare(that : BEncodedString) = value.compareTo(that value)
   }
 
-  case class BEncodedList(value: List[BEncoded]) extends BEncoded {
+  case class BEncodedList(val value: List[BEncoded]) extends BEncoded {
     override def toString = value.foldLeft[String]("l")((x, y) => x + y.toString) + "e"
   }
 
-  case class BEncodedDict(value: Map[BEncodedString, BEncoded]) extends BEncoded {
+  case class BEncodedDict(val value: Map[BEncodedString, BEncoded]) extends BEncoded {
     override def toString = value.foldLeft[String]("d")((x, y) => x + s"${y._1.toString}${y._2.toString}") + "e"
   }
 
@@ -181,7 +183,7 @@ package object types {
       }
       innerDecodeDict(remaining.tail, List()) match {
         case None => None
-        case Some((list : List[(BEncoded,BEncoded)],str)) => Some((BEncodedDict(Map[BEncodedString, BEncoded](list : _*)), str))
+        case Some((list : List[(BEncoded,BEncoded)],str)) => Some((BEncodedDict(TreeMap[BEncodedString, BEncoded](list : _*)), str))
       }
     }
 
