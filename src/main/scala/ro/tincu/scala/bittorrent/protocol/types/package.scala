@@ -17,6 +17,7 @@ package object types {
         println(torr.announce)
       }
     }
+    BEncoded.decodeDict("d8:completei238e10:incompletei1e8:intervali1800e5:peers6:�L_���e")
   }
 
   abstract class BEncoded {}
@@ -174,9 +175,9 @@ package object types {
           case 'e' => Some((acc, rest.tail))
           case _ => decodeString (rest) match {
             case None => None
-            case Some ((key: BEncodedString, remain: String) ) => getNextDecoderMethod (remain.head) (remain) match {
+            case Some ((key: BEncodedString, remain: String) ) =>{println(key); getNextDecoderMethod (remain.head) (remain) } match {
               case None => None
-              case Some ((value: BEncoded, remain2: String) ) => innerDecodeDict (remain2, acc :+ (key, value) )
+              case Some ((value: BEncoded, remain2: String) ) =>{println(value); innerDecodeDict (remain2, acc :+ (key, value) )}
             }
           }
         }
