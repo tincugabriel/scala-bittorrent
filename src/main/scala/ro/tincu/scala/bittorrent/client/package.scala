@@ -2,11 +2,20 @@ package ro.tincu.scala.bittorrent
 
 import java.net.URLDecoder
 
+import scalaj.http.Http
+
 /**
  * Created by gabriel on 9/2/14.
  */
 package object client {
   def main(args : Array[String])  {
+    val testLinkHTTPProtocol = "http://torrent.ubuntu.com:6969/announce?info_hash=%1B%9C%D9%D1%5Dp%1Au%1F%AD%82%91%89%7FP/%3F%E1%A9%FA" +
+      "&peer_id=12345678901234567890&port=7777&compact=1&downloaded=0&uploaded=0&left=0&"
+    val testLink = "magnet:?xt=urn:btih:9c2cc846e6cb91bcd9157fefadb820279ee529b0&dn=Edge+of+Tomorrow+%282014%29+720pTS-2-DVD+DD2.0+NL+Subs+NLU002&" +
+      "tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.publicbt.com%3A80&tr=udp%3A%2F%2Ftracker.istole.it%3A6969&"+
+      "tr=udp%3A%2F%2Fopen.demonii.com%3A1337"
+    val req = Http(testLinkHTTPProtocol).asString
+
     MagnetUri.fromString(testLink) match {
       case None => "Error parsing"
       case Some(a) =>  a foreach(x => {x._2.foreach(println);println()})
@@ -15,10 +24,11 @@ package object client {
       case None => "Parse error"
       case Some(x) => println(x)
     }
+    println("--------------------")
+    println(req.take(400))
   }
-  val testLink = "magnet:?xt=urn:btih:9c2cc846e6cb91bcd9157fefadb820279ee529b0&dn=Edge+of+Tomorrow+%282014%29+720pTS-2-DVD+DD2.0+NL+Subs+NLU002&" +
-    "tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.publicbt.com%3A80&tr=udp%3A%2F%2Ftracker.istole.it%3A6969&"+
-    "tr=udp%3A%2F%2Fopen.demonii.com%3A1337"
+
+
 
   object MagnetUri {
     def fromString(queryString : String) : Option[Map[String, Array[String]]] = {
