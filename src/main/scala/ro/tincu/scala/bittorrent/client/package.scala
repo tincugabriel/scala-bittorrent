@@ -2,7 +2,7 @@ package ro.tincu.scala.bittorrent
 
 import java.net.URLDecoder
 
-import ro.tincu.scala.bittorrent.protocol.types.types.BEncoded
+import ro.tincu.scala.bittorrent.types.bencoded.BEncoded
 
 import scalaj.http.Http
 
