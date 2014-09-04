@@ -71,6 +71,7 @@ object bencoded {
 
     def decodeDict(remaining : String) : Option[(BEncodedDict, String)] = {
       def innerDecodeDict(rest: String, acc : List[(BEncodedString, BEncoded)]) : Option[(List[(BEncodedString, BEncoded)], String)] = {
+        if(rest.isEmpty) None
         rest.head match {
           case 'e' => Some((acc, rest.tail))
           case  _ => {
